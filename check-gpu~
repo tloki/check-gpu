@@ -3,18 +3,12 @@
 # motivated by:
 # ps -up `nvidia-smi | tee /dev/stderr | tail -n +16 | head -n -1 | sed 's/\s\s*/ /g' | cut -d' ' -f3`
 
-# TODO: replace "PID" with "USR"
-# TODO: add aditional header with "PID" if include old values is selected
-# TODO: refactoring, optimizing, implementing more robust and compatible commands/practices
-
-ALSO_INCLUDE_OLD=1
-
 COMMAND=nvidia-smi
 
 # store command output to variable:
 raw_result=`$COMMAND`
 
-# find line number of "|_Processes:_GPU Memory_|", where '_' represents at least one whitespace.
+# find line number of "|_Processes:_GPU Memory_|", where '_' represents at least one whitespace. 
 # Just in case, find last grep match of it
 # cut to fetch line number
 PATTERN="|\s\+Processes:\s\+GPU Memory\s\+|"
@@ -22,10 +16,14 @@ HEADER_END_ADDITIONAL_LINES=2
 FOOTER_LENGTH=1
 PID_TABLE_LEFT_PART="|\s\+[0-9]\+\s\+[0-9]\+"
 PID_TABLE_RIGHT_PART="\s\+[0-9]\+$"
-PID_TABLE_ONLY_PID="[0-9]\+"
+PID_TABLE_ONLY_PID=""
 PID_TABLE_FIRST_COLUMNS="|\s\+[0-9]\+"
 
+# echo "${raw_result}"
+
 proc_stat_start_line=`echo "${raw_result}" | grep -n "${PATTERN}" | tail -n 1 | cut -f1 -d:`
+
+# echo $proc_stat_start_line
 
 # store first and last part of command output (constant) to variable
 header=`echo "${raw_result}" | head -n $((proc_stat_start_line + HEADER_END_ADDITIONAL_LINES))`
@@ -33,50 +31,31 @@ footer=`echo "${raw_result}" | tail -n $FOOTER_LENGTH`
 
 variable_part=`echo "${raw_result}" | tail -n +$((proc_stat_start_line + HEADER_END_ADDITIONAL_LINES + 1)) | head -n -$((FOOTER_LENGTH))`
 
+#declare -A process_ids
+
+# echo "${header}"
+# echo "${footer}"
+echo "${variable_part}"
+
 left_static_columns=`echo "${variable_part}" | grep -o "$PID_TABLE_FIRST_COLUMNS"`
 variable_columns=`echo "${variable_part}" | grep -o "$PID_TABLE_LEFT_PART" | grep -o "$PID_TABLE_RIGHT_PART"`
 
 # assume alignment of first columns is stable (consistend across rows)
 first_left=`echo "${left_static_columns}" | head -n 1`
 second_left=`echo "${variable_columns}" | head -n 1`
+# echo first left:  "${first_left}"
+# echo second left: "${second_left}"
 
 left_length1="${#first_left}"
 left_length2="${#second_left}"
 right_static_columns=`echo "${variable_part}"`
 
-right_static_columns=`echo "${variable_part}" | cut -c $((left_length1 + left_length2 + 1))-`
 max_username_length="$((left_length2 - 1))"
+echo max user len: "${max_username_length}"
 
-pids=`echo "$variable_columns" | grep -o "$PID_TABLE_ONLY_PID"`
-PAD="                                                                                                                                              "
+# echo left static columns:
+# echo "${left_static_columns}"
+echo variable columns:
+echo "${variable_columns}"
 
-replaced_variable=""
 
-for pid in $pids; do
-  username="$( ps -o uname= -p "${pid}" )"
-  if [ ${#username} -gt $max_username_length ]; then
-    username=${username:0:$max_username_length}
-  fi
-  username=$PAD$username
-  username=${username: -$((left_length2))}
-  replaced_variable="${replaced_variable}""${username}"$'\n'
-  #echo $pid: "$username"
-done
-
-replaced_variable=${replaced_variable::-1}
-
-#echo ${pids[0]}
-
-#echo "right static columns:"
-#echo "$right_static_columns"
-
-#echo "replaced variable"
-#echo "$replaced_variable"
-
-echo "$header"
-if [[ $ALSO_INCLUDE_OLD -eq 1 ]]; then
-  echo "$variable_part"
-  echo "$footer"
-fi
-paste <(echo "$left_static_columns") <(echo "$replaced_variable") <(echo "$right_static_columns") --delimiters ''
-echo "$footer"
