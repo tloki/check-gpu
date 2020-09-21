@@ -7,7 +7,7 @@
 # TODO: add aditional header with "PID" if include old values is selected
 # TODO: refactoring, optimizing, implementing more robust and compatible commands/practices
 
-ALSO_INCLUDE_OLD=1
+ALSO_INCLUDE_OLD=0
 
 COMMAND=nvidia-smi
 
